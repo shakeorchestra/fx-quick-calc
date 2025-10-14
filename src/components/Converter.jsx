@@ -92,7 +92,7 @@ export default function Converter({
 
   return (
     <div style={frameStyle} className="card" onClick={handleActivate} role="button" tabIndex={0}>
-      <h2 style={{ marginTop: 0 }}>{title}{isActive ? "（適用先）" : ""}</h2>
+      {/* <h2 style={{ marginTop: 0 }}>{title}{isActive ? "（適用先）" : ""}</h2> */}
 
       <div style={styles.row} onClick={(e) => e.stopPropagation()}>
         <select value={base} onChange={(e) => setBase(e.target.value)} style={styles.select}>
@@ -129,9 +129,9 @@ export default function Converter({
         {amount || 0} {base} = <strong>{converted}</strong> {target}
       </p>
 
-      <p style={{ fontSize: ".85rem", color: "#888", marginTop: ".6rem" }}>
+      {/* <p style={{ fontSize: ".85rem", color: "#888", marginTop: ".6rem" }}>
         最終更新: {timestamp || "取得中…"}
-      </p>
+      </p> */}
     </div>
   );
 }
