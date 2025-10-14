@@ -6,7 +6,7 @@ import React, { useState } from "react";
  * - 適用先は親側（App）のアクティブブロックに自動連動
  * - amount / setAmount に直に反映されます
  */
-export default function Calculator({ amount, setAmount, activeLabel = "ブロック①" }) {
+export default function Calculator({ amount, setAmount, activeLabel = "①" }) {
   const [input, setInput] = useState(String(amount ?? ""));
 
   // ブロック切り替え時に金額を同期（必要に応じて手動で更新）

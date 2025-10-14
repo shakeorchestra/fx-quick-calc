@@ -4,13 +4,14 @@ import Converter from "./components/Converter";
 import Calculator from "./components/Calculator";
 
 export default function App() {
+  // ブロックごとの金額（独立）
   const [amountA, setAmountA] = useState(1);
   const [amountB, setAmountB] = useState(1);
+
+  // どのブロックが現在の適用先か
   const [active, setActive] = useState("A"); // 'A' | 'B'
 
-  // ← 電卓の見出しに使っていたラベルは空にする
-  const activeLabel = ""; // もしくは null
-
+  const activeLabel = active === "A" ? "①" : "②"; // ←電卓用の簡略表示
   const activeAmount = active === "A" ? amountA : amountB;
   const activeSetter = active === "A" ? setAmountA : setAmountB;
 
@@ -21,7 +22,6 @@ export default function App() {
       <div style={styles.grid} className="app-grid">
         <Converter
           id="A"
-          title=""                 // ← 「ブロック①…」を消す
           amount={amountA}
           setAmount={setAmountA}
           isActive={active === "A"}
@@ -31,7 +31,6 @@ export default function App() {
         />
         <Converter
           id="B"
-          title=""                 // ← 「ブロック②…」を消す
           amount={amountB}
           setAmount={setAmountB}
           isActive={active === "B"}
@@ -41,10 +40,9 @@ export default function App() {
         />
       </div>
 
-      {/* 電卓の見出しに「（適用先：ブロック①）」等を出したくないのでラベルは空で渡す */}
+      {/* 常時ポップアップの電卓：アクティブのブロックに反映 */}
       <Calculator amount={activeAmount} setAmount={activeSetter} activeLabel={activeLabel} />
 
-      {/* フッターから「ブロックをクリックすると…」の説明も不要なら削除してOK */}
       <p style={styles.footer}>
         データ提供: Frankfurter API（約60秒ごとに自動更新）
       </p>
@@ -53,8 +51,22 @@ export default function App() {
 }
 
 const styles = {
-  container: { maxWidth: "1000px", margin: "2rem auto", padding: "1rem", fontFamily: "Arial, sans-serif" },
+  container: {
+    maxWidth: "1000px",
+    margin: "2rem auto",
+    padding: "1rem",
+    fontFamily: "Arial, sans-serif",
+  },
   title: { textAlign: "center" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" },
-  footer: { textAlign: "center", fontSize: "0.9rem", color: "#777", marginTop: "2rem" },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "1rem",
+  },
+  footer: {
+    textAlign: "center",
+    fontSize: "0.9rem",
+    color: "#777",
+    marginTop: "2rem",
+  },
 };
