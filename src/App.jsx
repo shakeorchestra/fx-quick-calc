@@ -11,7 +11,7 @@ export default function App() {
   // どのブロックが現在の適用先か
   const [active, setActive] = useState("A"); // 'A' | 'B'
 
-  const activeLabel = active === "A" ? "①" : "②"; // ←電卓用の簡略表示
+  const activeLabel = active === "A" ? "①" : "②";
   const activeAmount = active === "A" ? amountA : amountB;
   const activeSetter = active === "A" ? setAmountA : setAmountB;
 
@@ -22,6 +22,7 @@ export default function App() {
       <div style={styles.grid} className="app-grid">
         <Converter
           id="A"
+          title="①: USD → JPY 換算"
           amount={amountA}
           setAmount={setAmountA}
           isActive={active === "A"}
@@ -31,6 +32,7 @@ export default function App() {
         />
         <Converter
           id="B"
+          title="②: JPY → EUR 換算"
           amount={amountB}
           setAmount={setAmountB}
           isActive={active === "B"}
@@ -41,10 +43,14 @@ export default function App() {
       </div>
 
       {/* 常時ポップアップの電卓：アクティブのブロックに反映 */}
-      <Calculator amount={activeAmount} setAmount={activeSetter} activeLabel={activeLabel} />
+      <Calculator
+        amount={activeAmount}
+        setAmount={activeSetter}
+        activeLabel={activeLabel}
+      />
 
       <p style={styles.footer}>
-        データ提供: Frankfurter API（約60秒ごとに自動更新）
+        データ提供: Frankfurter API（約60秒ごとに自動更新） / ブロックをクリックすると電卓の適用先が切り替わります
       </p>
     </div>
   );
