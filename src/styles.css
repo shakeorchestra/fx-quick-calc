@@ -18,3 +18,49 @@ input:focus, select:focus { outline: none; border-color: #111827; }
 .chips { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .small { font-size: 12px; color: #4b5563; }
 .small.error { color: #b91c1c; }
+/* スマホ最適化（～768px） */
+@media (max-width: 768px) {
+  /* 2ブロックを縦1列に */
+  .app-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  /* カードの余白・角丸をやや大きめにして指で操作しやすく */
+  .card {
+    margin: 0 0.5rem !important;
+    padding: 1rem !important;
+    border-radius: 14px !important;
+  }
+
+  /* 入力まわりの“指で押しやすさ” */
+  input, select, button {
+    font-size: 16px !important;     /* iOSズーム防止＋読みやすい */
+    min-height: 44px !important;     /* 親指ガイドライン */
+    line-height: 1.2 !important;
+  }
+
+  /* レート表示の字面を少し大きく */
+  .rate-large {
+    font-size: 1.5rem !important;
+  }
+  .rate-small {
+    font-size: 1.1rem !important;
+    opacity: 0.9;
+  }
+
+  /* 電卓を“下部シート”化（常時ポップアップ） */
+  .calc-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;                /* 画面下ピタ */
+    z-index: 50;
+    background: #fff;
+    padding: 0.75rem 1rem 1rem;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.12);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+  }
+}
