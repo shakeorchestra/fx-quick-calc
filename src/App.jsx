@@ -16,7 +16,7 @@ export default function App() {
   const activeSetter = active === "A" ? setAmountA : setAmountB;
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="page-pad-for-calc">
       <h1 style={styles.title}>鮭オーケストラの外貨パッと計算</h1>
 
       <div style={styles.grid} className="app-grid">

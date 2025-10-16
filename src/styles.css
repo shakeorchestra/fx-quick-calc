@@ -1,66 +1,112 @@
 :root { color-scheme: light; }
+
+/* ---------- base ---------- */
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f6f7f8; }
-.container { max-width: 880px; margin: 40px auto; padding: 24px; background: #fff; border-radius: 16px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: #f6f7f8;
+}
+.container {
+  max-width: 880px;
+  margin: 40px auto;
+  padding: 24px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.06);
+}
 h1 { margin: 0 0 4px; font-size: 24px; }
 p.muted { margin: 0 0 16px; color: #6b7280; font-size: 13px; }
+
 .grid { display: grid; gap: 16px; }
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 720px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
 label { color: #374151; font-size: 13px; }
-input, select, button { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; }
+input, select, button {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
 input:focus, select:focus { outline: none; border-color: #111827; }
-.output { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 10px 12px; border-radius: 10px; font-weight: 600; }
+
+.output {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
 .row { display: flex; align-items: end; gap: 12px; }
 .btn { cursor: pointer; border: 1px solid #e5e7eb; background: #fff; }
 .btn:hover { background: #f9fafb; }
+
 .chips { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .small { font-size: 12px; color: #4b5563; }
 .small.error { color: #b91c1c; }
-/* スマホ最適化（～768px） */
+
+/* 大きめレート文字を使うとき（任意） */
+.rate-large { font-size: 1.5rem; }
+.rate-small  { font-size: 1.1rem; opacity: .9; }
+
+/* ---------- calculator (desktop default) ---------- */
+.calc-sheet {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.18);
+  padding: 12px;
+  z-index: 60;
+}
+
+/* ---------- responsive ---------- */
 @media (max-width: 768px) {
-  /* 2ブロックを縦1列に */
+  /* 2/3 カラム → 1列 */
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+
+  /* アプリ内グリッド（コンバーター2枚）も1列に */
   .app-grid {
     display: grid !important;
     grid-template-columns: 1fr !important;
     gap: 1rem !important;
   }
 
-  /* カードの余白・角丸をやや大きめにして指で操作しやすく */
+  /* カードの余白・角丸をやや大きく（指で操作しやすく） */
   .card {
-    margin: 0 0.5rem !important;
+    margin: 0 .5rem !important;
     padding: 1rem !important;
     border-radius: 14px !important;
   }
 
-  /* 入力まわりの“指で押しやすさ” */
+  /* 入力UIのタップしやすさ */
   input, select, button {
-    font-size: 16px !important;     /* iOSズーム防止＋読みやすい */
-    min-height: 44px !important;     /* 親指ガイドライン */
+    font-size: 16px !important;   /* iOSのズーム防止 */
+    min-height: 44px !important;  /* タップ領域 */
     line-height: 1.2 !important;
   }
 
-  /* レート表示の字面を少し大きく */
-  .rate-large {
-    font-size: 1.5rem !important;
-  }
-  .rate-small {
-    font-size: 1.1rem !important;
-    opacity: 0.9;
-  }
-
-  /* 電卓を“下部シート”化（常時ポップアップ） */
+  /* 電卓を“下部ドッキング”＆横幅いっぱい（安全域も考慮） */
   .calc-sheet {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;                /* 画面下ピタ */
-    z-index: 50;
-    background: #fff;
-    padding: 0.75rem 1rem 1rem;
-    box-shadow: 0 -10px 30px rgba(0,0,0,.12);
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    max-width: 680px;
+    margin: 0 auto;
     border-top-left-radius: 16px;
     border-top-right-radius: 16px;
+    z-index: 9999; /* 最前面 */
+  }
+
+  /* 電卓に隠れないようページ下に余白を確保（Appの一番外に付ける） */
+  .page-pad-for-calc {
+    padding-bottom: calc(340px + env(safe-area-inset-bottom)) !important;
+    /* ↑電卓の高さに合わせて 320–380px で微調整可 */
   }
 }
