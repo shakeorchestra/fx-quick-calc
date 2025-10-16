@@ -37,7 +37,7 @@ export default function Converter({
   useEffect(() => {
     let alive = true;
     (async () => {
-      const data = await fetchRates(base);
+      const data = await fetchRates(base, target);
       if (!alive || !data) return;
       const r = data?.rates?.[target];
       setRate(r ?? null);
