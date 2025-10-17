@@ -1,10 +1,8 @@
-// api/quote.js
-// CommonJS形式: Vercel Node Function で確実に動く為替レートAPI
-
+// api/quote.js (ESM 版)
 const FRANKFURTER_CODES = new Set([
   "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
   "BRL","INR","SGD","HKD","TWD","THB","SEK","NOK","DKK","ZAR",
-  "PLN","CZK","HUF","RON","TRY","IDR","ILS","PHP","MYR","NZD"
+  "PLN","CZK","HUF","RON","TRY","IDR","ILS","PHP","MYR","NZD",
 ]);
 
 async function getJSON(url) {
@@ -14,39 +12,48 @@ async function getJSON(url) {
 }
 
 async function getRate(base, target) {
-  // 1) Frankfurter
+  // 1) Frankfurter（base が対応していれば優先）
   if (FRANKFURTER_CODES.has(base)) {
     try {
-      const data = await getJSON(`https://api.frankfurter.app/latest?from=${base}&to=${target}`);
+      const data = await getJSON(
+        `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
+      );
       const r = data?.rates?.[target];
-      if (typeof r === "number") return { rate: r, date: data.date, source: "frankfurter" };
+      if (typeof r === "number") {
+        return { rate: r, date: data?.date || "", source: "frankfurter" };
+      }
     } catch (_) {}
   }
 
-  // 2) exchangerate.host
+  // 2) exchangerate.host の convert
   try {
-    const data = await getJSON(`https://api.exchangerate.host/convert?from=${base}&to=${target}`);
+    const data = await getJSON(
+      `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
+    );
     const r = data?.result;
-    if (typeof r === "number") return { rate: r, date: data.date, source: "exchangerate.host" };
+    if (typeof r === "number") {
+      return { rate: r, date: data?.date || "", source: "exchangerate.host" };
+    }
   } catch (_) {}
 
-  // 3) open.er-api.com
+  // 3) open.er-api.com（USD 基準 → 比率で算出）
   try {
     const data = await getJSON("https://open.er-api.com/v6/latest/USD");
     if (data?.rates?.[base] && data?.rates?.[target]) {
       const r = data.rates[target] / data.rates[base];
-      return { rate: r, date: data.time_last_update_utc, source: "open.er-api" };
+      return { rate: r, date: data?.time_last_update_utc || "", source: "open.er-api" };
     }
   } catch (_) {}
 
   return null;
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
-    const q = req.query || {};
-    const from = String(q.from || q.base || "").toUpperCase();
-    const to = String(q.to || q.target || "").toUpperCase();
+    // Vercel の Node 関数は req.url が相対の場合があるのでホスト補完
+    const url = new URL(req.url, `https://${req.headers.host}`);
+    const from = (url.searchParams.get("from") || url.searchParams.get("base") || "").toUpperCase();
+    const to   = (url.searchParams.get("to")   || url.searchParams.get("target") || "").toUpperCase();
 
     if (!from || !to) {
       res.status(400).json({ error: "missing base/target" });
@@ -63,6 +70,6 @@ module.exports = async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
   }
-};
+}
 
-module.exports.config = { runtime: "nodejs18.x" };
+export const config = { runtime: "nodejs18.x" };
