@@ -1,5 +1,5 @@
 // api/quote.js
-// Vercel Serverless Function: base→target の為替レートを返す（堅牢フォールバック付き）
+// CommonJS形式: Vercel Node Function で確実に動く為替レートAPI
 
 const FRANKFURTER_CODES = new Set([
   "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
@@ -7,89 +7,62 @@ const FRANKFURTER_CODES = new Set([
   "PLN","CZK","HUF","RON","TRY","IDR","ILS","PHP","MYR","NZD"
 ]);
 
-const withTimeout = (ms, p) =>
-  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
-
-async function getJSON(url, timeoutMs = 8000) {
-  const res = await withTimeout(timeoutMs, fetch(url));
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
-/** 1) Frankfurter（base が対応のときのみ） */
-async function tryFrankfurter(base, target) {
-  if (!FRANKFURTER_CODES.has(base)) return null;
-  try {
-    const data = await getJSON(
-      `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
-    );
-    const r = data?.rates?.[target];
-    if (typeof r === "number") {
-      return { rate: r, date: data?.date || "", source: "frankfurter" };
-    }
-  } catch (_) {}
-  return null;
-}
+async function getRate(base, target) {
+  // 1) Frankfurter
+  if (FRANKFURTER_CODES.has(base)) {
+    try {
+      const data = await getJSON(`https://api.frankfurter.app/latest?from=${base}&to=${target}`);
+      const r = data?.rates?.[target];
+      if (typeof r === "number") return { rate: r, date: data.date, source: "frankfurter" };
+    } catch (_) {}
+  }
 
-/** 2) exchangerate.host の /convert */
-async function tryExchangerateHost(base, target) {
+  // 2) exchangerate.host
   try {
-    const data = await getJSON(
-      `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
-    );
+    const data = await getJSON(`https://api.exchangerate.host/convert?from=${base}&to=${target}`);
     const r = data?.result;
-    if (typeof r === "number") {
-      return { rate: r, date: data?.date || "", source: "exchangerate.host" };
-    }
+    if (typeof r === "number") return { rate: r, date: data.date, source: "exchangerate.host" };
   } catch (_) {}
-  return null;
-}
 
-/** 3) open.er-api.com（USD 基準表から計算） */
-async function tryOpenErApi(base, target) {
+  // 3) open.er-api.com
   try {
     const data = await getJSON("https://open.er-api.com/v6/latest/USD");
-    const rates = data?.rates;
-    if (rates && rates[base] && rates[target]) {
-      // USD→target / USD→base = base→target
-      const r = rates[target] / rates[base];
-      const date = data?.time_last_update_utc?.slice(0, 16) || "";
-      if (Number.isFinite(r)) return { rate: r, date, source: "open.er-api" };
+    if (data?.rates?.[base] && data?.rates?.[target]) {
+      const r = data.rates[target] / data.rates[base];
+      return { rate: r, date: data.time_last_update_utc, source: "open.er-api" };
     }
   } catch (_) {}
+
   return null;
 }
 
-// ---- Serverless handler (CommonJS) ----
 module.exports = async (req, res) => {
   try {
     const q = req.query || {};
-    const base = String(q.from || "").toUpperCase();
-    const target = String(q.to || "").toUpperCase();
+    const from = String(q.from || q.base || "").toUpperCase();
+    const to = String(q.to || q.target || "").toUpperCase();
 
-    if (!base || !target) {
+    if (!from || !to) {
       res.status(400).json({ error: "missing base/target" });
       return;
     }
 
-    const ans =
-      (await tryFrankfurter(base, target)) ||
-      (await tryExchangerateHost(base, target)) ||
-      (await tryOpenErApi(base, target));
-
-    if (!ans) {
-      res.status(502).json({ error: "rate_unavailable" });
+    const data = await getRate(from, to);
+    if (!data) {
+      res.status(502).json({ error: "rate unavailable" });
       return;
     }
 
-    // CDN キャッシュ（任意）
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
-    res.status(200).json(ans);
+    res.status(200).json(data);
   } catch (e) {
-    console.error("API error:", e);
-    res.status(500).json({ error: "internal_error", message: String(e?.message || e) });
+    res.status(500).json({ error: String(e?.message || e) });
   }
 };
 
-// Vercel ランタイムを Node 18 に固定（fetch が使える）
 module.exports.config = { runtime: "nodejs18.x" };
