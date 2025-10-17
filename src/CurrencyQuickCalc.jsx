@@ -19,32 +19,37 @@ export default function CurrencyQuickCalc(){
   const [base, setBase] = useState('USD')
   const [quote, setQuote] = useState('JPY')
   const [amount, setAmount] = useState('100')
-  const [rates, setRates] = useState({})
-  const [lastUpdated, setLastUpdated] = useState('')
+  const [rate, setRate] = useState(null)
+  const [date, setDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const debouncedAmount = useDebounced(amount)
 
-  const fetchRates = async (from) => {
+  // ✅ サーバーレスAPI (/api/quote) を使ってレートを取得
+  const fetchRate = async (from, to) => {
     setLoading(true); setError('')
     try {
-      const res = await fetch(`https://api.frankfurter.app/latest?from=${from}`)
-      if(!res.ok) throw new Error(`HTTP ${res.status}`)
+      const res = await fetch(`/api/quote?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&t=${Date.now()}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      setRates(data.rates || {})
-      setLastUpdated(data.date || '')
-    } catch (e){
+      if (data && data.rate) {
+        setRate(data.rate)
+        setDate(data.date || '')
+      } else {
+        setRate(null)
+        setError('レートを取得できませんでした')
+      }
+    } catch (e) {
       console.error(e)
       setError('レート取得に失敗しました。ネット接続とAPIの状態をご確認ください。')
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
   }
-  useEffect(()=>{ fetchRates(base) }, [base])
 
-  const rate = useMemo(()=>{
-    if(quote === base) return 1
-    return rates[quote]
-  }, [rates, quote, base])
+  // base, quote の変更で自動更新
+  useEffect(()=>{ fetchRate(base, quote) }, [base, quote])
 
   const converted = useMemo(()=>{
     const a = parseFloat(String(debouncedAmount).replace(/,/g,''))
@@ -86,7 +91,7 @@ export default function CurrencyQuickCalc(){
       </div>
       <div className="small" style={{marginTop:8}}>
         <div>{loading ? 'レート更新中…' : rate ? `レート: 1 ${base} = ${rate?.toLocaleString?.() || rate} ${quote}` : 'レート未取得'}</div>
-        {lastUpdated && <div>基準日: {lastUpdated} (ECB)</div>}
+        {date && <div>基準日: {date}</div>}
         {error && <div className="small error">{error}</div>}
       </div>
       <div className="chips" style={{marginTop:16}}>
@@ -99,7 +104,7 @@ export default function CurrencyQuickCalc(){
           </button>
         ))}
       </div>
-      <p className="small" style={{marginTop:12}}>注意: 無料APIのため実レートと数分の遅延・提示スプレッド差があります。送金や会計には必ず金融機関のレートで再確認してください。</p>
+      <p className="small" style={{marginTop:12}}>データ提供: Shake Orchestra / API経由（/api/quote）</p>
     </div>
   )
 }

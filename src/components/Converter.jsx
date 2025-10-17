@@ -34,16 +34,17 @@ export default function Converter({
   const [rate, setRate] = useState(null);
   const [timestamp, setTimestamp] = useState("");
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { rate, date } = await fetchPairRate(base, target);
-      if (!alive) return;
-      setRate(rate ?? null);
-      setTimestamp(date || "");
-    })();
-    return () => { alive = false; };
-  }, [base, target]);
+ useEffect(() => {
+  let alive = true;
+  (async () => {
+    const { rate, date } = await fetchPairRate(base, target);
+    if (!alive) return;
+    // rate が 0.0... の場合も truthy 判定に引っかかるよう、明示的に判定
+    setRate(Number.isFinite(rate) ? rate : null);
+    setTimestamp(date || "");
+  })();
+  return () => { alive = false; };
+}, [base, target]);
 
   const converted = useMemo(() => {
     const n = parseFloat(amount || 0);

@@ -1,13 +1,13 @@
-// /api/quote.js  （ESM）
+// api/quote.js  —— Vercel Serverless Function (CommonJS)
 
-const FRANKFURTER_CODES = new Set([
-  "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
-  "BRL","INR","SGD","HKD","TWD","THB","SEK","NOK","DKK","ZAR",
-  "PLN","CZK","HUF","RON","TRY","IDR","ILS","PHP","MYR","NZD"
+const FR_CODES = new Set([
+  "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN","BRL","INR",
+  "SGD","HKD","TWD","THB","SEK","NOK","DKK","ZAR","PLN","CZK","HUF","RON",
+  "TRY","IDR","ILS","PHP","MYR","NZD"
 ]);
 
 const withTimeout = (ms, p) =>
-  Promise.race([ p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms)) ]);
+  Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("timeout")), ms))]);
 
 async function getJSON(url, ms = 8000) {
   const res = await withTimeout(ms, fetch(url));
@@ -15,88 +15,89 @@ async function getJSON(url, ms = 8000) {
   return res.json();
 }
 
-// 1) Frankfurter: base が対応のときのみ
+/** 1) exchangerate.host の convert (直接変換) */
+async function tryEXConvert(base, target) {
+  const url = `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`;
+  const data = await getJSON(url);
+  if (typeof data?.result === "number") {
+    return { rate: data.result, date: data?.date || "" };
+  }
+  return null;
+}
+
+/** 2) exchangerate.host の latest(base=USD) でクロス計算 */
+async function tryEXCross(base, target) {
+  const url = `https://api.exchangerate.host/latest?base=USD&symbols=${encodeURIComponent(base)},${encodeURIComponent(target)}`;
+  const data = await getJSON(url);
+  const rBase = data?.rates?.[base];
+  const rTarget = data?.rates?.[target];
+  if (typeof rBase === "number" && typeof rTarget === "number") {
+    // USD→target / USD→base = base→target
+    const rate = rTarget / rBase;
+    return { rate, date: data?.date || "" };
+  }
+  return null;
+}
+
+/** 3) Frankfurter（base が対応している場合のみ） */
 async function tryFrankfurter(base, target) {
-  if (!FRANKFURTER_CODES.has(base)) return null;
-  const data = await getJSON(
-    `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
-  );
-  const rate = data?.rates?.[target];
-  if (typeof rate === "number") {
-    return { rate, date: data?.date || "", source: "frankfurter" };
+  if (!FR_CODES.has(base)) return null;
+  const url = `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`;
+  const data = await getJSON(url);
+  const r = data?.rates?.[target];
+  if (typeof r === "number") {
+    return { rate: r, date: data?.date || "" };
   }
   return null;
 }
 
-// 2) exchangerate.host convert
-async function tryExHost(base, target) {
-  const data = await getJSON(
-    `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
-  );
-  const rate = data?.result;
-  if (typeof rate === "number") {
-    // data.date は "YYYY-MM-DD"
-    return { rate, date: data?.date || "", source: "exchangerate.host" };
-  }
-  return null;
-}
-
-// 3) open.er-api.com latest/base （全ペア対応）→ target を取り出す
-async function tryOpenER(base, target) {
-  const data = await getJSON(
-    `https://open.er-api.com/v6/latest/${encodeURIComponent(base)}`
-  );
-  const rate = data?.rates?.[target];
-  if (typeof rate === "number") {
-    // date 相当がないので updated_unix から近似
-    const date =
-      typeof data?.time_last_update_utc === "string"
-        ? data.time_last_update_utc.slice(5, 16) // "17 Oct 2025" → 雑に日付化
-        : "";
-    return { rate, date, source: "open.er-api" };
-  }
-  return null;
-}
-
-export default async function handler(req, res) {
+/** CJS ハンドラ */
+module.exports = async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const base = (url.searchParams.get("from") || "").toUpperCase();
-    const target = (url.searchParams.get("to") || "").toUpperCase();
-    const debug = url.searchParams.get("debug") === "1";
+    const base = url.searchParams.get("from") || url.searchParams.get("base");
+    const target = url.searchParams.get("to") || url.searchParams.get("target");
 
     if (!base || !target) {
-      res.status(400).json({ error: "missing base/target" });
-      return;
-    }
-    if (base === target) {
-      const body = { rate: 1, date: new Date().toISOString().slice(0, 10) };
-      res.status(200).json(debug ? { ...body, source: "identity" } : body);
-      return;
+      res.statusCode = 400;
+      res.setHeader("content-type", "application/json; charset=utf-8");
+      return res.end(JSON.stringify({ error: "missing base/target" }));
     }
 
-    let out = null;
-    const errors = [];
-
-    // 順番に試す
-    for (const step of [tryFrankfurter, tryExHost, tryOpenER]) {
-      try {
-        out = await step(base, target);
-        if (out) break;
-      } catch (e) {
-        errors.push(`${step.name}: ${e?.message || e}`);
+    // 1) convert 直
+    try {
+      const r1 = await tryEXConvert(base, target);
+      if (r1) {
+        res.setHeader("content-type", "application/json; charset=utf-8");
+        return res.end(JSON.stringify(r1));
       }
-    }
+    } catch {}
 
-    if (!out) {
-      res.status(200).json(debug ? { rate: null, date: "", errors } : { rate: null, date: "" });
-      return;
-    }
+    // 2) USD クロス
+    try {
+      const r2 = await tryEXCross(base, target);
+      if (r2) {
+        res.setHeader("content-type", "application/json; charset=utf-8");
+        return res.end(JSON.stringify(r2));
+      }
+    } catch {}
 
-    // 本番は rate/date のみに統一。debug=1 のときは source も返す
-    const body = { rate: out.rate, date: out.date || "" };
-    res.status(200).json(debug ? { ...body, source: out.source } : body);
+    // 3) Frankfurter（対応 base のみ）
+    try {
+      const r3 = await tryFrankfurter(base, target);
+      if (r3) {
+        res.setHeader("content-type", "application/json; charset=utf-8");
+        return res.end(JSON.stringify(r3));
+      }
+    } catch {}
+
+    // 全部失敗
+    res.statusCode = 200; // 200で返しつつ rate:null（フロントで「—」表示）
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    return res.end(JSON.stringify({ rate: null, date: "" }));
   } catch (e) {
-    res.status(500).json({ error: e?.message || "internal error" });
+    res.statusCode = 500;
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    return res.end(JSON.stringify({ error: e.message || "server error" }));
   }
-}
+};
