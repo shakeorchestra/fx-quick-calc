@@ -37,11 +37,15 @@ export default function Converter({
  useEffect(() => {
   let alive = true;
   (async () => {
-    const { rate, date } = await fetchPairRate(base, target);
-    if (!alive) return;
-    // rate が 0.0... の場合も truthy 判定に引っかかるよう、明示的に判定
-    setRate(Number.isFinite(rate) ? rate : null);
-    setTimestamp(date || "");
+    try {
+      const { rate, date } = await fetchPairRate(base, target);
+      if (!alive) return;
+      setRate(rate ?? null);
+      setTimestamp(date || "");
+    } catch (e) {
+      console.error("quote fetch failed:", e);
+      if (alive) { setRate(null); setTimestamp(""); }
+    }
   })();
   return () => { alive = false; };
 }, [base, target]);
