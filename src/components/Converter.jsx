@@ -1,6 +1,6 @@
 // src/components/Converter.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchRates, getCurrencyNameJa } from "../api/rates";
+import { fetchPairRate, getCurrencyNameJa } from "../api/rates";
 
 /**
  * Converter
@@ -35,19 +35,17 @@ export default function Converter({
   const [timestamp, setTimestamp] = useState("");
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const data = await fetchRates(base, target);
-      if (!alive || !data) return;
-      const r = data?.rates?.[target];
-      setRate(r ?? null);
-      // Frankfurter の日付（YYYY-MM-DD）
-      setTimestamp(data?.date || "");
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [base, target]);
+  let alive = true;
+  (async () => {
+    const { rate, date } = await fetchPairRate(base, target);
+    if (!alive) return;
+    setRate(rate ?? null);
+    setTimestamp(date || "");
+  })();
+  return () => {
+    alive = false;
+  };
+}, [base, target]);
 
   const converted = useMemo(() => {
     const n = parseFloat(amount || 0);

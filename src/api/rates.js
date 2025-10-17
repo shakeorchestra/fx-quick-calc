@@ -1,5 +1,6 @@
 // src/api/rates.js
-// Frankfurter（ECB）＋ exchangerate.host（フォールバック）
+// Frankfurter を優先し、ダメなら exchangerate.host の /convert にフォールバック
+// ペア単位で確実に数値を返す
 
 const FRANKFURTER_CODES = new Set([
   "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
@@ -25,17 +26,22 @@ export function getCurrencyNameJa(code) {
   return map[code] || code;
 }
 
-export async function fetchRates(base, ensureSymbol) {
-  // ---------- 1. Frankfurter試行 ----------
+/**
+ * base→target のレートを1発で取得
+ * 戻り値: { rate: number|null, date: string }
+ */
+export async function fetchPairRate(base, target) {
+  // 1) Frankfurter（対応ベースのみ）で試す
   if (FRANKFURTER_CODES.has(base)) {
     try {
-      const res = await fetch(`https://api.frankfurter.app/latest?from=${base}`);
+      const res = await fetch(
+        `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
+      );
       if (res.ok) {
         const data = await res.json();
-        const rates = data?.rates || {};
-        // 対象通貨がFrankfurterに存在すれば即返す
-        if (ensureSymbol && rates[ensureSymbol] !== undefined) {
-          return { rates, date: data.date || "" };
+        const r = data?.rates?.[target];
+        if (typeof r === "number") {
+          return { rate: r, date: data?.date || "" };
         }
       }
     } catch (e) {
@@ -43,15 +49,23 @@ export async function fetchRates(base, ensureSymbol) {
     }
   }
 
-  // ---------- 2. exchangerate.hostフォールバック ----------
+  // 2) フォールバック: exchangerate.host の convert エンドポイント
   try {
-    const url = `https://api.exchangerate.host/latest?base=${base}`;
-    const res2 = await fetch(url);
-    const data2 = await res2.json();
-    if (!data2 || !data2.rates) throw new Error("No rates in exchangerate.host");
-    return { rates: data2.rates, date: data2.date || "" };
+    const res = await fetch(
+      `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
+    );
+    if (!res.ok) throw new Error("exchangerate.host error");
+    const data = await res.json();
+    // result に数値が入る
+    const r = data?.result;
+    if (typeof r === "number") {
+      // date は info タイムスタンプか、なければレスポンスの date を利用
+      const date = data?.date || "";
+      return { rate: r, date };
+    }
   } catch (e) {
-    console.error("Fallback also failed:", e);
-    return { rates: {}, date: "" };
+    console.error("Fallback failed:", e);
   }
+
+  return { rate: null, date: "" };
 }
