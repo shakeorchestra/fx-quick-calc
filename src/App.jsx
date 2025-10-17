@@ -4,11 +4,8 @@ import Converter from "./components/Converter";
 import Calculator from "./components/Calculator";
 
 export default function App() {
-  // ブロックごとの金額（独立）
   const [amountA, setAmountA] = useState(1);
   const [amountB, setAmountB] = useState(1);
-
-  // どのブロックが現在の適用先か
   const [active, setActive] = useState("A"); // 'A' | 'B'
 
   const activeLabel = active === "A" ? "①" : "②";
@@ -16,13 +13,13 @@ export default function App() {
   const activeSetter = active === "A" ? setAmountA : setAmountB;
 
   return (
-    <div style={styles.container} className="page-pad-for-calc">
+    <div style={styles.container}>
       <h1 style={styles.title}>鮭オーケストラの外貨パッと計算</h1>
 
       <div style={styles.grid} className="app-grid">
         <Converter
           id="A"
-          title="①: USD → JPY 換算"
+          title="①"
           amount={amountA}
           setAmount={setAmountA}
           isActive={active === "A"}
@@ -32,7 +29,7 @@ export default function App() {
         />
         <Converter
           id="B"
-          title="②: JPY → EUR 換算"
+          title="②"
           amount={amountB}
           setAmount={setAmountB}
           isActive={active === "B"}
@@ -42,12 +39,7 @@ export default function App() {
         />
       </div>
 
-      {/* 常時ポップアップの電卓：アクティブのブロックに反映 */}
-      <Calculator
-        amount={activeAmount}
-        setAmount={activeSetter}
-        activeLabel={activeLabel}
-      />
+      <Calculator amount={activeAmount} setAmount={activeSetter} activeLabel={activeLabel} />
 
       <p style={styles.footer}>
         データ提供: Frankfurter API（約60秒ごとに自動更新） / ブロックをクリックすると電卓の適用先が切り替わります

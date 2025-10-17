@@ -1,6 +1,6 @@
 // src/api/rates.js
-// Frankfurter を優先し、ダメなら exchangerate.host の /convert にフォールバック
-// ペア単位で確実に数値を返す
+// しぶとい多段フォールバック: Frankfurter → exchangerate.host(convert)
+// → exchangerate.host(latest) → 逆方向を反転
 
 const FRANKFURTER_CODES = new Set([
   "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
@@ -26,46 +26,100 @@ export function getCurrencyNameJa(code) {
   return map[code] || code;
 }
 
+async function getJSON(url, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Frankfurter: base→target */
+async function tryFrankfurter(base, target) {
+  // Frankfurterは base が対応内のときのみ意味がある
+  if (!FRANKFURTER_CODES.has(base)) return null;
+  try {
+    const data = await getJSON(
+      `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
+    );
+    const r = data?.rates?.[target];
+    if (typeof r === "number") return { rate: r, date: data?.date || "" };
+  } catch (e) {
+    console.warn("Frankfurter failed:", e);
+  }
+  return null;
+}
+
+/** exchangerate.host convert: base→target */
+async function tryERHConvert(base, target) {
+  try {
+    const data = await getJSON(
+      `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
+    );
+    const r = data?.result;
+    if (typeof r === "number") return { rate: r, date: data?.date || "" };
+  } catch (e) {
+    console.warn("ERH convert failed:", e);
+  }
+  return null;
+}
+
+/** exchangerate.host latest: base→target */
+async function tryERHLatest(base, target) {
+  try {
+    const data = await getJSON(
+      `https://api.exchangerate.host/latest?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(target)}`
+    );
+    const r = data?.rates?.[target];
+    if (typeof r === "number") return { rate: r, date: data?.date || "" };
+  } catch (e) {
+    console.warn("ERH latest failed:", e);
+  }
+  return null;
+}
+
+/** 逆方向を取って反転 (target→base を取得し 1/率 にする) */
+async function tryInverse(base, target) {
+  // Frankfurterで逆方向
+  const invF = await tryFrankfurter(target, base);
+  if (invF?.rate) return { rate: 1 / invF.rate, date: invF.date };
+
+  // ERH convert で逆方向
+  const invC = await tryERHConvert(target, base);
+  if (invC?.rate) return { rate: 1 / invC.rate, date: invC.date };
+
+  // ERH latest で逆方向
+  const invL = await tryERHLatest(target, base);
+  if (invL?.rate) return { rate: 1 / invL.rate, date: invL.date };
+
+  return null;
+}
+
 /**
  * base→target のレートを1発で取得
  * 戻り値: { rate: number|null, date: string }
  */
 export async function fetchPairRate(base, target) {
-  // 1) Frankfurter（対応ベースのみ）で試す
-  if (FRANKFURTER_CODES.has(base)) {
-    try {
-      const res = await fetch(
-        `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const r = data?.rates?.[target];
-        if (typeof r === "number") {
-          return { rate: r, date: data?.date || "" };
-        }
-      }
-    } catch (e) {
-      console.warn("Frankfurter failed:", e);
-    }
-  }
+  // 1) Frankfurter（取れたら即返す）
+  const f = await tryFrankfurter(base, target);
+  if (f?.rate) return f;
 
-  // 2) フォールバック: exchangerate.host の convert エンドポイント
-  try {
-    const res = await fetch(
-      `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`
-    );
-    if (!res.ok) throw new Error("exchangerate.host error");
-    const data = await res.json();
-    // result に数値が入る
-    const r = data?.result;
-    if (typeof r === "number") {
-      // date は info タイムスタンプか、なければレスポンスの date を利用
-      const date = data?.date || "";
-      return { rate: r, date };
-    }
-  } catch (e) {
-    console.error("Fallback failed:", e);
-  }
+  // 2) ERH convert
+  const c = await tryERHConvert(base, target);
+  if (c?.rate) return c;
 
+  // 3) ERH latest
+  const l = await tryERHLatest(base, target);
+  if (l?.rate) return l;
+
+  // 4) 逆方向を取得して反転
+  const inv = await tryInverse(base, target);
+  if (inv?.rate) return inv;
+
+  // 5) 全滅
   return { rate: null, date: "" };
 }

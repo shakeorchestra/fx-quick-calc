@@ -1,16 +1,15 @@
 // src/components/Calculator.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 /**
  * 常時ポップアップの電卓
  * - 適用先は親側（App）のアクティブブロックに自動連動
- * - amount / setAmount に直に反映されます
+ * - amount / setAmount に直に反映
  */
-export default function Calculator({ amount, setAmount, activeLabel = "①" }) {
+export default function Calculator({ amount, setAmount, activeLabel = "ブロック①" }) {
   const [input, setInput] = useState(String(amount ?? ""));
 
-  // ブロック切り替え時に金額を同期（必要に応じて手動で更新）
-  React.useEffect(() => {
+  useEffect(() => {
     setInput(String(amount ?? ""));
   }, [amount]);
 
@@ -18,7 +17,6 @@ export default function Calculator({ amount, setAmount, activeLabel = "①" }) {
     if (v === "C") return setInput("");
     if (v === "=") {
       try {
-        // 安全な eval 代替
         // eslint-disable-next-line no-new-func
         const result = Function(`"use strict";return (${input || 0})`)();
         const text = String(result ?? "");
@@ -33,36 +31,22 @@ export default function Calculator({ amount, setAmount, activeLabel = "①" }) {
   };
 
   const buttons = [
-    "7",
-    "8",
-    "9",
-    "/",
-    "4",
-    "5",
-    "6",
-    "*",
-    "1",
-    "2",
-    "3",
-    "-",
-    "0",
-    ".",
-    "C",
-    "+",
+    "7","8","9","/",
+    "4","5","6","*",
+    "1","2","3","-",
+    "0",".","C","+",
     "=",
   ];
 
   return (
     <div style={styles.wrap} className="calc-sheet" onClick={(e) => e.stopPropagation()}>
       <div style={styles.header}>電卓（適用先：{activeLabel}）</div>
-
       <input
         style={styles.display}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="式を入力（例: 100*1.1）"
       />
-
       <div style={styles.grid}>
         {buttons.map((b) => (
           <button key={b} style={styles.btn} onClick={() => handleClick(b)}>

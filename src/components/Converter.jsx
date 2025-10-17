@@ -25,7 +25,7 @@ export default function Converter({
   const [base, setBase] = useState(defaultBase);
   const [target, setTarget] = useState(defaultTarget);
 
-  // 親から来なければ自前stateを使う（＝ブロック間は連動しない）
+  // 親から来なければ自前state（＝ブロック間は連動しない）
   const [amountLocal, setAmountLocal] = useState(1);
   const amount = amountProp ?? amountLocal;
   const setAmount = setAmountProp ?? setAmountLocal;
@@ -35,17 +35,15 @@ export default function Converter({
   const [timestamp, setTimestamp] = useState("");
 
   useEffect(() => {
-  let alive = true;
-  (async () => {
-    const { rate, date } = await fetchPairRate(base, target);
-    if (!alive) return;
-    setRate(rate ?? null);
-    setTimestamp(date || "");
-  })();
-  return () => {
-    alive = false;
-  };
-}, [base, target]);
+    let alive = true;
+    (async () => {
+      const { rate, date } = await fetchPairRate(base, target);
+      if (!alive) return;
+      setRate(rate ?? null);
+      setTimestamp(date || "");
+    })();
+    return () => { alive = false; };
+  }, [base, target]);
 
   const converted = useMemo(() => {
     const n = parseFloat(amount || 0);
@@ -53,30 +51,13 @@ export default function Converter({
     return (n * rate).toLocaleString(undefined, { maximumFractionDigits: 6 });
   }, [amount, rate]);
 
+  // 表示用通貨リスト（COP あり）
   const allCodes = useMemo(
     () => [
-      "USD",
-      "JPY",
-      "EUR",
-      "GBP",
-      "AUD",
-      "CAD",
-      "CHF",
-      "CNY",
-      "KRW",
-      "MXN",
-      "BRL",
-      "INR",
-      "RUB",
-      "SGD",
-      "HKD",
-      "TWD",
-      "THB",
-      "SEK",
-      "NOK",
-      "DKK",
-      "ZAR",
-      "COP", // ← コロンビアペソ追加
+      "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
+      "BRL","INR","RUB","SGD","HKD","TWD","THB","SEK","NOK","DKK",
+      "ZAR","PLN","CZK","HUF","RON","TRY","IDR","ILS","PHP","MYR",
+      "NZD","COP",
     ],
     []
   );
@@ -90,6 +71,7 @@ export default function Converter({
 
   return (
     <div style={frameStyle} className="card" onClick={handleActivate} role="button" tabIndex={0}>
+      {/* タイトルは非表示にしておく場合はコメントのまま */}
       {/* <h2 style={{ marginTop: 0 }}>{title}{isActive ? "（適用先）" : ""}</h2> */}
 
       <div style={styles.row} onClick={(e) => e.stopPropagation()}>
@@ -127,6 +109,7 @@ export default function Converter({
         {amount || 0} {base} = <strong>{converted}</strong> {target}
       </p>
 
+      {/* 最終更新を出したいときだけ表示 */}
       {/* <p style={{ fontSize: ".85rem", color: "#888", marginTop: ".6rem" }}>
         最終更新: {timestamp || "取得中…"}
       </p> */}
