@@ -1,100 +1,46 @@
 // api/quote.js
-// Vercel Serverless Function: base→target の為替レートをしぶとく取得して返す
-
-const FRANKFURTER_CODES = new Set([
-  "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN",
-  "BRL","INR","SGD","HKD","TWD","THB","SEK","NOK","DKK","ZAR",
-  "PLN","CZK","HUF","RON","TRY","IDR","ILS","PHP","MYR","NZD"
-]);
-
-const withTimeout = (ms, fetchPromise) =>
-  Promise.race([
-    fetchPromise,
-    new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
-  ]);
-
-async function getJSON(url, timeoutMs = 8000) {
-  const res = await withTimeout(timeoutMs, fetch(url));
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-// 各APIを順に試す（Frankfurter → exchangerate.host → open.er-api → 逆方向）
-async function tryFrankfurter(base, target) {
-  if (!FRANKFURTER_CODES.has(base)) return null;
-  try {
-    const data = await getJSON(`https://api.frankfurter.app/latest?from=${base}&to=${target}`);
-    const r = data?.rates?.[target];
-    if (typeof r === "number") return { rate: r, date: data?.date || "" };
-  } catch (_) {}
-  return null;
-}
-
-async function tryERHConvert(base, target) {
-  try {
-    const data = await getJSON(`https://api.exchangerate.host/convert?from=${base}&to=${target}`);
-    const r = data?.result;
-    if (typeof r === "number") return { rate: r, date: data?.date || "" };
-  } catch (_) {}
-  return null;
-}
-
-async function tryERHLatest(base, target) {
-  try {
-    const data = await getJSON(`https://api.exchangerate.host/latest?base=${base}&symbols=${target}`);
-    const r = data?.rates?.[target];
-    if (typeof r === "number") return { rate: r, date: data?.date || "" };
-  } catch (_) {}
-  return null;
-}
-
-async function tryERAPI(base, target) {
-  try {
-    const data = await getJSON(`https://open.er-api.com/v6/latest/${base}`);
-    const r = data?.rates?.[target];
-    if (typeof r === "number") return { rate: r, date: "" };
-  } catch (_) {}
-  return null;
-}
-
-async function tryInverse(base, target) {
-  for (const f of [
-    () => tryFrankfurter(target, base),
-    () => tryERHConvert(target, base),
-    () => tryERHLatest(target, base),
-    () => tryERAPI(target, base),
-  ]) {
-    const inv = await f();
-    if (inv?.rate) return { rate: 1 / inv.rate, date: inv.date || "" };
-  }
-  return null;
-}
+// 為替レートを取得するサーバーレス関数（Vercel用）
 
 export default async function handler(req, res) {
-  try {
-    const { base, target } = req.query;
-    if (!base || !target) {
-      res.status(400).json({ error: "missing base/target" });
-      return;
-    }
+  const { from, to } = req.query;
 
-    for (const f of [
-      () => tryFrankfurter(base, target),
-      () => tryERHConvert(base, target),
-      () => tryERHLatest(base, target),
-      () => tryERAPI(base, target),
-      () => tryInverse(base, target),
-    ]) {
-      const out = await f();
-      if (out?.rate) {
-        res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=60");
-        res.status(200).json({ ok: true, ...out });
-        return;
+  // --- パラメータチェック ---
+  if (!from || !to) {
+    return res.status(400).json({ error: "base/target パラメータが足りません" });
+  }
+
+  // --- 1. Frankfurter で試す ---
+  try {
+    const frank = await fetch(
+      `https://api.frankfurter.app/latest?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
+    if (frank.ok) {
+      const data = await frank.json();
+      const rate = data?.rates?.[to];
+      if (typeof rate === "number") {
+        return res.status(200).json({ rate, date: data.date || "" });
       }
     }
-
-    res.status(200).json({ ok: false, rate: null, date: "" });
-  } catch (e) {
-    res.status(200).json({ ok: false, rate: null, date: "" });
+  } catch (err) {
+    console.warn("Frankfurter failed:", err);
   }
+
+  // --- 2. exchangerate.host でフォールバック ---
+  try {
+    const ex = await fetch(
+      `https://api.exchangerate.host/convert?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
+    if (ex.ok) {
+      const data = await ex.json();
+      const rate = data?.result;
+      if (typeof rate === "number") {
+        return res.status(200).json({ rate, date: data.date || "" });
+      }
+    }
+  } catch (err) {
+    console.error("exchangerate.host failed:", err);
+  }
+
+  // --- 全部ダメならエラー返す ---
+  return res.status(500).json({ error: "為替レート取得に失敗しました" });
 }
