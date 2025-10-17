@@ -1,5 +1,5 @@
 // src/api/rates.js
-// フロントからは常に自分の /api/quote を叩く（Frankfurter等はサーバ側だけで扱う）
+// 2カードUI用：フロントからは常に自前の /api/quote を叩く
 
 export function getCurrencyNameJa(code) {
   const map = {
@@ -25,15 +25,15 @@ export function getCurrencyNameJa(code) {
  */
 export async function fetchPairRate(base, target) {
   try {
-    const url = `/api/quote?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}&t=${Date.now()}`;
+    const url = `/api/quote?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`;
     const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) {
-      console.warn("quote api error:", res.status);
-      return { rate: null, date: "" };
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const r = typeof data?.rate === "number" ? data.rate : Number(data?.rate);
-    return { rate: Number.isFinite(r) ? r : null, date: data?.date || "" };
+    // {rate: number, date: "YYYY-MM-DD"} を想定
+    if (typeof data?.rate === "number") {
+      return { rate: data.rate, date: data.date || "" };
+    }
+    return { rate: null, date: "" };
   } catch (e) {
     console.error("fetchPairRate error:", e);
     return { rate: null, date: "" };
