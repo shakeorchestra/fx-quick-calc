@@ -1,8 +1,8 @@
 // src/components/Calculator.jsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 /**
- * 常時ポップアップの電卓
+ * 常時表示の電卓（横並び用）
  * - 適用先は親側（App）のアクティブブロックに自動連動
  * - amount / setAmount に直に反映
  */
@@ -14,7 +14,7 @@ export default function Calculator({ amount, setAmount, activeLabel = "ブロッ
   }, [amount]);
 
   const handleClick = (v) => {
-    if (v === "C") return setInput("");
+    if (v === "AC") return setInput("");
     if (v === "=") {
       try {
         // eslint-disable-next-line no-new-func
@@ -27,74 +27,62 @@ export default function Calculator({ amount, setAmount, activeLabel = "ブロッ
       }
       return;
     }
+    if (v === "±") return setInput((p) => (p ? String(-Number(p)) : ""));
     setInput((prev) => (prev === "エラー" ? String(v) : prev + String(v)));
   };
 
-  const buttons = [
-    "7","8","9","/",
-    "4","5","6","*",
-    "1","2","3","-",
-    "0",".","C","+",
-    "=",
+  const keys = [
+    ["AC", "±", "%", "÷"],
+    ["7", "8", "9", "×"],
+    ["4", "5", "6", "−"],
+    ["1", "2", "3", "+"],
+    ["0", ".", "="],
   ];
 
+  // 演算子の置換（見た目を保ちつつ eval ではなく Function で計算）
+  const opMap = { "×": "*", "÷": "/", "−": "-" };
+  useEffect(() => {
+    // 入力時は見た目の記号のままでOK。計算 "=" で JS 記号に置換して評価します。
+  }, []);
+
+  const click = (label) => {
+    if (label === "=") {
+      try {
+        const expr = input.replace(/[×÷−]/g, (m) => opMap[m] || m);
+        // eslint-disable-next-line no-new-func
+        const result = Function(`"use strict";return (${expr || 0})`)();
+        const text = String(result ?? "");
+        setInput(text);
+        setAmount(text);
+      } catch {
+        setInput("エラー");
+      }
+      return;
+    }
+    handleClick(label);
+  };
+
   return (
-    <div style={styles.wrap} className="calc-sheet" onClick={(e) => e.stopPropagation()}>
-      <div style={styles.header}>電卓（適用先：{activeLabel}）</div>
+    <div className="calc-sheet">
+      <div className="calc-head">電卓（適用先：{activeLabel}）</div>
       <input
-        style={styles.display}
+        className="calc-display"
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        placeholder="式を入力（例: 100*1.1）"
+        placeholder="0"
       />
-      <div style={styles.grid}>
-        {buttons.map((b) => (
-          <button key={b} style={styles.btn} onClick={() => handleClick(b)}>
-            {b}
+
+      <div className="calc-grid">
+        {keys.slice(0, 4).flat().map((k) => (
+          <button key={k} className={`btn ${"÷×−+".includes(k) ? "op" : ""}`} onClick={() => click(k)}>
+            {k}
           </button>
         ))}
+        {/* 最下段だけ 0 をワイドに */}
+        <button className="btn span-2" onClick={() => click("0")}>0</button>
+        <button className="btn" onClick={() => click(".")}>.</button>
+        <button className="btn op" onClick={() => click("=")}>=</button>
       </div>
     </div>
   );
 }
-
-const styles = {
-  wrap: {
-    position: "fixed",
-    right: "16px",
-    bottom: "16px",
-    width: "280px",
-    background: "white",
-    border: "1px solid #e5e7eb",
-    borderRadius: "14px",
-    boxShadow: "0 12px 30px rgba(0,0,0,.18)",
-    padding: "12px",
-    zIndex: 9999,
-  },
-  header: {
-    fontWeight: 700,
-    marginBottom: "6px",
-    fontSize: ".95rem",
-  },
-  display: {
-    width: "100%",
-    padding: "10px",
-    fontSize: "1.1rem",
-    borderRadius: "10px",
-    border: "1px solid #ddd",
-    marginBottom: "8px",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "6px",
-  },
-  btn: {
-    padding: "10px 0",
-    fontSize: "1rem",
-    borderRadius: "10px",
-    border: "1px solid #e5e7eb",
-    background: "#f8fafc",
-    cursor: "pointer",
-  },
-};

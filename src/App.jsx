@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Converter from "./components/Converter";
 import Calculator from "./components/Calculator";
+import "./styles.css";
 
 export default function App() {
   const [amountA, setAmountA] = useState(1);
@@ -13,58 +14,35 @@ export default function App() {
   const activeSetter = active === "A" ? setAmountA : setAmountB;
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>鮭オーケストラの外貨パッと計算</h1>
+    <main className="layout">
+      <h1 className="title">鮭オーケストラの外貨パッと計算</h1>
 
-      <div style={styles.grid} className="app-grid">
+      {/* 左カラム：カード2枚 */}
+      <section className="cards">
         <Converter
           id="A"
-          title="①"
           amount={amountA}
           setAmount={setAmountA}
           isActive={active === "A"}
           onActivate={setActive}
           defaultBase="USD"
-          defaultTarget="JPY"
+          defaultTarget="COP"
         />
         <Converter
           id="B"
-          title="②"
           amount={amountB}
           setAmount={setAmountB}
           isActive={active === "B"}
           onActivate={setActive}
-          defaultBase="JPY"
+          defaultBase="COP"
           defaultTarget="EUR"
         />
-      </div>
+      </section>
 
-      <Calculator amount={activeAmount} setAmount={activeSetter} activeLabel={activeLabel} />
-
-      <p style={styles.footer}>
-        データ提供: Frankfurter API（約60秒ごとに自動更新） / ブロックをクリックすると電卓の適用先が切り替わります
-      </p>
-    </div>
+      {/* 右カラム：電卓（横並び） */}
+      <aside className="side">
+        <Calculator amount={activeAmount} setAmount={activeSetter} activeLabel={activeLabel} />
+      </aside>
+    </main>
   );
 }
-
-const styles = {
-  container: {
-    maxWidth: "1000px",
-    margin: "2rem auto",
-    padding: "1rem",
-    fontFamily: "Arial, sans-serif",
-  },
-  title: { textAlign: "center" },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "1rem",
-  },
-  footer: {
-    textAlign: "center",
-    fontSize: "0.9rem",
-    color: "#777",
-    marginTop: "2rem",
-  },
-};

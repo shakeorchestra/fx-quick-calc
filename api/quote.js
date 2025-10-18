@@ -1,103 +1,62 @@
-// api/quote.js  —— Vercel Serverless Function (CommonJS)
+// src/api/quote.js
+// AbstractAPI: https://www.abstractapi.com/api/exchange-rate-api
+const ABSTRACT_API_KEY = "934964a55fbf49b390229269e794a981"; // ← あなたのキー（公開NG。Gitに上げない）
 
-const FR_CODES = new Set([
-  "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","KRW","MXN","BRL","INR",
-  "SGD","HKD","TWD","THB","SEK","NOK","DKK","ZAR","PLN","CZK","HUF","RON",
-  "TRY","IDR","ILS","PHP","MYR","NZD"
-]);
-
-const withTimeout = (ms, p) =>
-  Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("timeout")), ms))]);
-
-async function getJSON(url, ms = 8000) {
-  const res = await withTimeout(ms, fetch(url));
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-/** 1) exchangerate.host の convert (直接変換) */
-async function tryEXConvert(base, target) {
-  const url = `https://api.exchangerate.host/convert?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`;
-  const data = await getJSON(url);
-  if (typeof data?.result === "number") {
-    return { rate: data.result, date: data?.date || "" };
-  }
-  return null;
-}
-
-/** 2) exchangerate.host の latest(base=USD) でクロス計算 */
-async function tryEXCross(base, target) {
-  const url = `https://api.exchangerate.host/latest?base=USD&symbols=${encodeURIComponent(base)},${encodeURIComponent(target)}`;
-  const data = await getJSON(url);
-  const rBase = data?.rates?.[base];
-  const rTarget = data?.rates?.[target];
-  if (typeof rBase === "number" && typeof rTarget === "number") {
-    // USD→target / USD→base = base→target
-    const rate = rTarget / rBase;
-    return { rate, date: data?.date || "" };
-  }
-  return null;
-}
-
-/** 3) Frankfurter（base が対応している場合のみ） */
-async function tryFrankfurter(base, target) {
-  if (!FR_CODES.has(base)) return null;
-  const url = `https://api.frankfurter.app/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(target)}`;
-  const data = await getJSON(url);
-  const r = data?.rates?.[target];
-  if (typeof r === "number") {
-    return { rate: r, date: data?.date || "" };
-  }
-  return null;
-}
-
-/** CJS ハンドラ */
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const base = url.searchParams.get("from") || url.searchParams.get("base");
-    const target = url.searchParams.get("to") || url.searchParams.get("target");
+    // 正規化（小文字で来てもOK）
+    let { base, target } = req.query || {};
+    base   = String(base || "").trim().toUpperCase();
+    target = String(target || "").trim().toUpperCase();
 
     if (!base || !target) {
-      res.statusCode = 400;
-      res.setHeader("content-type", "application/json; charset=utf-8");
-      return res.end(JSON.stringify({ error: "missing base/target" }));
+      return res.status(400).json({ error: "Missing base or target" });
+    }
+    if (base === target) {
+      // 1:1 のときはAPI叩かず即返す
+      return res.status(200).json({ rate: 1, date: new Date().toISOString() });
     }
 
-    // 1) convert 直
-    try {
-      const r1 = await tryEXConvert(base, target);
-      if (r1) {
-        res.setHeader("content-type", "application/json; charset=utf-8");
-        return res.end(JSON.stringify(r1));
-      }
-    } catch {}
+    const url =
+      `https://exchange-rates.abstractapi.com/v1/live/` +
+      `?api_key=${ABSTRACT_API_KEY}&base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`;
 
-    // 2) USD クロス
-    try {
-      const r2 = await tryEXCross(base, target);
-      if (r2) {
-        res.setHeader("content-type", "application/json; charset=utf-8");
-        return res.end(JSON.stringify(r2));
-      }
-    } catch {}
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
 
-    // 3) Frankfurter（対応 base のみ）
-    try {
-      const r3 = await tryFrankfurter(base, target);
-      if (r3) {
-        res.setHeader("content-type", "application/json; charset=utf-8");
-        return res.end(JSON.stringify(r3));
-      }
-    } catch {}
+    const text = await response.text(); // まずテキストで受ける（APIがエラー時にHTML/テキスト返すケース対策）
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { /* JSONでない場合は空 */ }
 
-    // 全部失敗
-    res.statusCode = 200; // 200で返しつつ rate:null（フロントで「—」表示）
-    res.setHeader("content-type", "application/json; charset=utf-8");
-    return res.end(JSON.stringify({ rate: null, date: "" }));
-  } catch (e) {
-    res.statusCode = 500;
-    res.setHeader("content-type", "application/json; charset=utf-8");
-    return res.end(JSON.stringify({ error: e.message || "server error" }));
+    // AbstractAPIはエラー時に { error: { message, code } } を返す
+    if (!response.ok || data?.error) {
+      return res.status(response.status || 502).json({
+        error: "Upstream API error",
+        details: data?.error ?? text ?? null,
+      });
+    }
+
+    // 期待レスポンス:
+    // {
+    //   "base": "USD",
+    //   "exchange_rates": { "COP": 4332.1 },
+    //   "last_updated": "2025-10-17T12:34:00Z"
+    // }
+    const rate = data?.exchange_rates?.[target];
+    const date = data?.last_updated || "";
+
+    if (typeof rate !== "number" || !isFinite(rate)) {
+      return res.status(502).json({
+        error: "No valid numeric rate in response",
+        body: data,
+      });
+    }
+
+    return res.status(200).json({ rate, date });
+  } catch (err) {
+    console.error("[/api/quote] error:", err);
+    return res.status(500).json({ error: err?.message ?? "Internal error" });
   }
-};
+}
