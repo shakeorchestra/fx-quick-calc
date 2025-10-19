@@ -1,88 +1,181 @@
-// src/components/Calculator.jsx
-import React, { useEffect, useState } from "react";
+// src/Calculator.jsx
+import React, { useState } from "react"
 
-/**
- * 常時表示の電卓（横並び用）
- * - 適用先は親側（App）のアクティブブロックに自動連動
- * - amount / setAmount に直に反映
- */
-export default function Calculator({ amount, setAmount, activeLabel = "ブロック①" }) {
-  const [input, setInput] = useState(String(amount ?? ""));
+export default function Calculator() {
+  const [input, setInput] = useState("0")
+  const [justEvaluated, setJustEvaluated] = useState(false)
 
-  useEffect(() => {
-    setInput(String(amount ?? ""));
-  }, [amount]);
+  // --- % 前処理 ---
+  const preprocessPercent = (expr) => {
+    let s = expr
+    // 乗除: 右項の B% を (B/100)
+    s = s.replace(/([*/])\s*(\d+(?:\.\d+)?)%/g, (_, op, b) => `${op}(${b}/100)`)
+    // 加減: 左項 A を基準  A±B% → A±(A*B/100)
+    s = s.replace(
+      /(\d+(?:\.\d+)?)(\s*[+\-]\s*)(\d+(?:\.\d+)?)%/g,
+      (_, a, op, b) => `${a}${op}(${a}*${b}/100)`
+    )
+    return s
+  }
 
-  const handleClick = (v) => {
-    if (v === "AC") return setInput("");
-    if (v === "=") {
-      try {
-        // eslint-disable-next-line no-new-func
-        const result = Function(`"use strict";return (${input || 0})`)();
-        const text = String(result ?? "");
-        setInput(text);
-        setAmount(text);
-      } catch {
-        setInput("エラー");
-      }
-      return;
+  const append = (val) => {
+    setInput((prev) => {
+      const base = justEvaluated && /[0-9.]/.test(val) ? "" : prev
+      const next = base === "0" && /[0-9]/.test(val) ? val : base + val
+      setJustEvaluated(false)
+      return next
+    })
+  }
+
+  const clearAll = () => {
+    setInput("0")
+    setJustEvaluated(false)
+  }
+
+  const toggleSign = () => {
+    // 末尾の数値だけ符号反転
+    setInput((prev) => {
+      const m = prev.match(/(-?\d+(\.\d+)?)$/)
+      if (!m) return prev
+      const n = parseFloat(m[1]) * -1
+      return prev.slice(0, prev.length - m[1].length) + String(n)
+    })
+  }
+
+  const evaluate = () => {
+    try {
+      const expr = input.replace(/×/g, "*").replace(/÷/g, "/")
+      if (!/^[0-9+\-*/().%\s]+$/.test(expr)) throw new Error("invalid")
+      // eslint-disable-next-line no-eval
+      const v = eval(preprocessPercent(expr))
+      setInput(String(v))
+      setJustEvaluated(true)
+    } catch {
+      setInput("エラー")
+      setJustEvaluated(true)
     }
-    if (v === "±") return setInput((p) => (p ? String(-Number(p)) : ""));
-    setInput((prev) => (prev === "エラー" ? String(v) : prev + String(v)));
-  };
+  }
 
-  const keys = [
+  // ---- キー配置（デザイン維持）----
+  const rows = [
     ["AC", "±", "%", "÷"],
     ["7", "8", "9", "×"],
-    ["4", "5", "6", "−"],
+    ["4", "5", "6", "−"], // 表示は "−"、計算時は "-" に置換
     ["1", "2", "3", "+"],
     ["0", ".", "="],
-  ];
+  ]
 
-  // 演算子の置換（見た目を保ちつつ eval ではなく Function で計算）
-  const opMap = { "×": "*", "÷": "/", "−": "-" };
-  useEffect(() => {
-    // 入力時は見た目の記号のままでOK。計算 "=" で JS 記号に置換して評価します。
-  }, []);
+  // ---- スタイル（既存配色に合わせたダークUI；外部依存なし）----
+  const root = {
+    width: 360,
+    background: "#0f172a",
+    borderRadius: 18,
+    padding: 12,
+    color: "#e5e7eb",
+    boxShadow: "0 10px 30px rgba(0,0,0,.25)",
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
+  }
+  const screenWrap = {
+    background: "#0b1426",
+    borderRadius: 12,
+    padding: "14px 16px",
+    margin: "6px 6px 12px",
+    minHeight: 64,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    fontSize: 34,
+    fontWeight: 700,
+    overflow: "hidden",
+  }
+  const grid = { display: "grid", gap: 12, padding: "0 6px 8px" }
+  const rowStyle = { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }
+  const btn = {
+    background: "#1f2937",
+    border: "none",
+    color: "#e5e7eb",
+    borderRadius: 14,
+    fontSize: 22,
+    padding: "14px 0",
+    cursor: "pointer",
+  }
+  const btnWide = { ...btn, gridColumn: "span 2" }
+  const btnOp = { ...btn, background: "#f59e0b", color: "#111827" }
+  const eqBtn = { ...btnOp }
 
-  const click = (label) => {
-    if (label === "=") {
-      try {
-        const expr = input.replace(/[×÷−]/g, (m) => opMap[m] || m);
-        // eslint-disable-next-line no-new-func
-        const result = Function(`"use strict";return (${expr || 0})`)();
-        const text = String(result ?? "");
-        setInput(text);
-        setAmount(text);
-      } catch {
-        setInput("エラー");
-      }
-      return;
-    }
-    handleClick(label);
-  };
+  const onPress = (label) => {
+    if (label === "AC") return clearAll()
+    if (label === "±") return toggleSign()
+    if (label === "%") return append("%")
+    if (label === "=") return evaluate()
+    if (label === "×") return append("*")
+    if (label === "÷") return append("/")
+    if (label === "−") return append("-")
+    if (label === "+") return append("+")
+    if (label === ".") return append(".")
+    if (label === "0") return append("0")
+    // 数字
+    return append(label)
+  }
 
   return (
-    <div className="calc-sheet">
-      <div className="calc-head">電卓（適用先：{activeLabel}）</div>
-      <input
-        className="calc-display"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="0"
-      />
+    <div style={root}>
+      <div aria-label="display" style={screenWrap}>
+        {input}
+      </div>
 
-      <div className="calc-grid">
-        {keys.slice(0, 4).flat().map((k) => (
-          <button key={k} className={`btn ${"÷×−+".includes(k) ? "op" : ""}`} onClick={() => click(k)}>
-            {k}
-          </button>
+      <div style={grid}>
+        {/* 1行目 */}
+        <div style={rowStyle}>
+          {rows[0].map((k) => (
+            <button
+              key={k}
+              onClick={() => onPress(k)}
+              style={k === "÷" ? btnOp : btn}
+              aria-label={k}
+              title={k}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+
+        {/* 2〜4行目 */}
+        {[1, 2, 3].map((ri) => (
+          <div style={rowStyle} key={ri}>
+            {rows[ri].map((k, i) => (
+              <button
+                key={k + i}
+                onClick={() => onPress(k)}
+                style={i === 3 ? btnOp : btn}
+                aria-label={k}
+                title={k}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
         ))}
-        {/* 最下段だけ 0 をワイドに */}
-        <button className="btn span-2" onClick={() => click("0")}>0</button>
-        <button className="btn" onClick={() => click(".")}>.</button>
-        <button className="btn op" onClick={() => click("=")}>=</button>
+
+        {/* 最下段 0 . = */}
+        <div style={rowStyle}>
+          <button onClick={() => onPress("0")} style={btnWide} aria-label="0" title="0">
+            0
+          </button>
+          <button onClick={() => onPress(".")} style={btn} aria-label="." title=".">
+            .
+          </button>
+          <button onClick={() => onPress("=")} style={eqBtn} aria-label="Enter" title="Enter">
+            {/* = を矢印に置換（デザイン変更はここだけ） */}
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10.5l2.3 2.3-1.4 1.4L7 15.3l4.4-4.4 1.4 1.4L10.5 14H18V5H6v3H4V5Z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
-  );
+  )
 }
