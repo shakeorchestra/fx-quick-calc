@@ -25,8 +25,8 @@ export default function App() {
           setAmount={setAmountA}
           isActive={active === "A"}
           onActivate={setActive}
-          defaultBase="USD"
-          defaultTarget="COP"
+          defaultBase="JPY"
+          defaultTarget="USD"
         />
         <Converter
           id="B"
@@ -34,8 +34,8 @@ export default function App() {
           setAmount={setAmountB}
           isActive={active === "B"}
           onActivate={setActive}
-          defaultBase="COP"
-          defaultTarget="EUR"
+          defaultBase="USD"
+          defaultTarget="JPY"
         />
       </section>
 
