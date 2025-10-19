@@ -1,145 +1,59 @@
-// src/components/Converter.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { getCurrencyNameJa, fetchPairRate } from "../api/rates.js";
+import React, { useEffect, useState } from "react";
+import { fetchRate, getCurrencyNameJa } from "../api/rates.js";
 
-export default function Converter({
-  id,
-  title = "通貨換算",
-  defaultBase = "USD",
-  defaultTarget = "JPY",
-  amount,
-  setAmount,
-  isActive,
-  onActivate,
-}) {
-  const [base, setBase] = useState(defaultBase);
-  const [target, setTarget] = useState(defaultTarget);
-  const [localAmount, setLocalAmount] = useState(amount || 1);
-  const [rate, setRate] = useState(null);
-  const [date, setDate] = useState(null);
-  const [error, setError] = useState(null);
+const CODES = ["USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","HKD","KRW","MXN","TWD","SGD","NZD"];
 
-  // 画面幅でモバイル判定（PCはfalseのまま）
-  const isMobile =
-    typeof window !== "undefined" &&
-    window.matchMedia &&
-    window.matchMedia("(max-width: 480px)").matches;
+export default function Converter({ calcValue }) {
+  const [from, setFrom] = useState("USD");
+  const [to, setTo] = useState("JPY");
+  const [amount, setAmount] = useState(1);
+  const [rate, setRate] = useState(0);
+  const [date, setDate] = useState("");
 
-  const activeAmount = amount ?? localAmount;
-
-  const handleActivate = () => {
-    onActivate && onActivate(id);
-  };
-
-  const handleChange = (e) => {
-    const v = e.target.value;
-    setAmount ? setAmount(v) : setLocalAmount(v);
-  };
-
-  useEffect(() => {
-    let ignore = false;
-    (async () => {
-      try {
-        const res = await fetchPairRate(base, target);
-        if (ignore) return;
-        if (res.rate) {
-          setRate(res.rate);
-          setDate(res.date);
-          setError(null);
-        } else {
-          setRate(null);
-          setError(res.error || "レートを取得できませんでした");
-        }
-      } catch {
-        if (!ignore) {
-          setError("レートを取得できませんでした");
-          setRate(null);
-        }
-      }
+  useEffect(()=>{ if(calcValue!=null) setAmount(calcValue); },[calcValue]);
+  useEffect(()=>{
+    let alive = true;
+    (async()=>{
+      const r = await fetchRate(from,to);
+      if(!alive) return;
+      setRate(r.rate||0);
+      setDate(r.date||"");
     })();
-    return () => {
-      ignore = true;
-    };
-  }, [base, target]);
+    return ()=>{ alive=false; };
+  },[from,to]);
 
-  const converted = useMemo(() => {
-    const n = parseFloat(activeAmount);
-    if (!rate || isNaN(n)) return "";
-    return (n * rate).toLocaleString(undefined, { maximumFractionDigits: 6 });
-  }, [activeAmount, rate]);
-
-  const currencyLabel = (c) => `${c} — ${getCurrencyNameJa(c)}`;
+  const result = Number.isFinite(rate) ? (amount*rate) : 0;
 
   return (
-    <div
-      className={`card ${isActive ? "active" : ""}`}
-      data-active={isActive}
-      onClick={handleActivate}
-      role="button"
-      tabIndex={0}
-    >
+    <div className="card">
       <div className="row">
-        <select
-          value={base}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setBase(e.target.value)}
-        >
-          {[
-            "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","HKD","KRW",
-            "MXN","TWD","SGD","NZD","SEK","NOK","DKK","PLN","CZK","HUF",
-            "TRY","THB","IDR","INR","PHP","MYR","ZAR","BRL","ILS","AED",
-            "SAR","CLP","COP","ARS","PEN","VND"
-          ].map((c) => (
-            <option key={c} value={c}>{currencyLabel(c)}</option>
-          ))}
+        <label className="visually-hidden" htmlFor="from">変換元</label>
+        <select id="from" value={from} onChange={(e)=>setFrom(e.target.value)}>
+          {CODES.map(c=> <option key={c} value={c}>{c}</option>)}
         </select>
 
         <input
           type="number"
-          value={activeAmount}
-          onClick={(e) => e.stopPropagation()}
-          onChange={handleChange}
-          // スマホだけキーボード抑止（PCはそのまま）
-          readOnly={isMobile}
-          inputMode={isMobile ? "none" : "decimal"}
-          onFocus={isMobile ? (e) => e.target.blur() : undefined}
+          value={amount}
+          onChange={(e)=>setAmount(parseFloat(e.target.value)||0)}
+          inputMode="decimal"
+          aria-label="金額"
         />
 
-        <span style={{ fontSize: "1.4rem" }}>→</span>
+        <div aria-hidden>→</div>
 
-        <select
-          value={target}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setTarget(e.target.value)}
-        >
-          {[
-            "USD","JPY","EUR","GBP","AUD","CAD","CHF","CNY","HKD","KRW",
-            "MXN","TWD","SGD","NZD","SEK","NOK","DKK","PLN","CZK","HUF",
-            "TRY","THB","IDR","INR","PHP","MYR","ZAR","BRL","ILS","AED",
-            "SAR","CLP","COP","ARS","PEN","VND"
-          ].map((c) => (
-            <option key={c} value={c}>{currencyLabel(c)}</option>
-          ))}
+        <label className="visually-hidden" htmlFor="to">変換先</label>
+        <select id="to" value={to} onChange={(e)=>setTo(e.target.value)}>
+          {CODES.map(c=> <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
       <div className="rate-line">
-        {error ? (
-          <span style={{ color: "#dc2626" }}>{error}</span>
-        ) : rate ? (
-          <>
-            1 {base} = <b>{rate.toLocaleString(undefined, { maximumFractionDigits: 6 })}</b> {target}
-            <br />
-            {activeAmount} {base} = <b>{converted}</b> {target}
-          </>
-        ) : (
-          "レートを取得できませんでした"
-        )}
+        1 {from} = <b>{rate ? rate.toFixed(6) : "--"}</b> {to}<br/>
+        {amount} {from} = <b>{rate ? result.toFixed(6) : "--"}</b> {to}
       </div>
-
-      {date && (
-        <div className="rate-date">基準日: {new Date(date).toUTCString()}</div>
-      )}
+      <div className="rate-date">基準日: {date || "--"}</div>
+      <div className="small-muted">{from} — {getCurrencyNameJa(from)} / {to} — {getCurrencyNameJa(to)}</div>
     </div>
   );
 }
