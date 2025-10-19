@@ -81,3 +81,71 @@ body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,S
 .btn.op.active{ outline:2px solid rgba(255,255,255,.35); outline-offset:2px; }
 /* styles.css に追加（演算子選択の可視化） */
 .btn.op.active{ outline:2px solid rgba(255,255,255,.35); outline-offset:2px; }
+/* === 通貨セレクトと金額入力の幅指定 === */
+.currency-select {
+  width: 90px;            /* 約6文字分 */
+  min-width: 90px;
+  max-width: 110px;
+}
+
+.amount-input {
+  min-width: 260px;       /* 1,000,000,000 も視認可 */
+  width: 100%;
+}
+/* ===== Converter card styles ===== */
+.conv-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+  padding: 24px;
+  margin: 16px 0;
+}
+.conv-card--active { outline: 2px solid #60a5fa; }
+
+.conv-label {
+  font-size: 12px;
+  color: #64748b;
+  display: block;
+  margin-bottom: 6px;
+}
+.conv-label.mt { margin-top: 14px; }
+
+.conv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.conv-select {
+  width: 90px;           /* 約6文字分 */
+  min-width: 90px;
+  max-width: 110px;
+  padding: 4px 6px;
+  text-align: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.conv-amount {
+  min-width: 260px;      /* 1,000,000,000 も視認可 */
+  width: 100%;
+  padding: 6px 8px;
+  text-align: right;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.conv-arrow { user-select: none; color: #475569; }
+
+.conv-result {
+  margin-top: 12px;
+  font-weight: 600;
+  font-size: 18px;
+}
+.conv-highlight { color: #1d4ed8; }
+
+.conv-error { color: #dc2626; font-size: 13px; margin-top: 6px; }
+.conv-date  { color: #64748b; font-size: 12px; margin-top: 6px; }
