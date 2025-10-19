@@ -1,18 +1,19 @@
 // src/components/Calculator.jsx
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 
 export default function Calculator({ amount, setAmount, activeLabel }) {
   const [input, setInput] = useState("0")
   const [justEvaluated, setJustEvaluated] = useState(false)
 
-  const pushToParent = (val) => {
-    if (typeof setAmount === "function") {
-      const n = Number(val)
-      if (!Number.isNaN(n)) setAmount(n)
+  // 外側の金額が変わったら画面に同期（UIのみ。計算状態は壊さない）
+  useEffect(() => {
+    if (amount != null && !justEvaluated) {
+      setInput(String(amount))
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amount])
 
-  // % 前処理
+  // --- % 前処理 ---
   const preprocessPercent = (expr) => {
     let s = expr
     s = s.replace(/([*/])\s*(\d+(?:\.\d+)?)%/g, (_, op, b) => `${op}(${b}/100)`)
@@ -52,16 +53,21 @@ export default function Calculator({ amount, setAmount, activeLabel }) {
       if (!/^[0-9+\-*/().%\s]+$/.test(expr)) throw new Error("invalid")
       // eslint-disable-next-line no-eval
       const v = eval(preprocessPercent(expr))
-      const s = String(v)
-      setInput(s)
+      const out = String(v)
+      setInput(out)
       setJustEvaluated(true)
-      pushToParent(s)          // ← 矢印(=)で親の入力に反映
+      // 親へ反映（矢印ボタン/＝押下時）
+      if (typeof setAmount === "function") {
+        const num = Number(v)
+        if (Number.isFinite(num)) setAmount(num)
+      }
     } catch {
       setInput("エラー")
       setJustEvaluated(true)
     }
   }
 
+  // ---- 配置（デザインはそのまま）----
   const rows = [
     ["AC", "±", "%", "÷"],
     ["7", "8", "9", "×"],
@@ -118,38 +124,63 @@ export default function Calculator({ amount, setAmount, activeLabel }) {
     if (label === "+") return append("+")
     if (label === ".") return append(".")
     if (label === "0") return append("0")
-    return append(label)
+    return append(label) // 数字
   }
 
   return (
     <div style={root}>
-      <div aria-label="display" style={screenWrap}>{input}</div>
+      <div aria-label="display" style={screenWrap}>
+        {input}
+      </div>
 
       <div style={grid}>
+        {/* 1行目 */}
         <div style={rowStyle}>
           {rows[0].map((k) => (
-            <button key={k} onClick={() => onPress(k)} style={k === "÷" ? btnOp : btn} aria-label={k} title={k}>
+            <button
+              key={k}
+              onClick={() => onPress(k)}
+              style={k === "÷" ? btnOp : btn}
+              aria-label={k}
+              title={k}
+            >
               {k}
             </button>
           ))}
         </div>
 
+        {/* 2〜4行目 */}
         {[1, 2, 3].map((ri) => (
           <div style={rowStyle} key={ri}>
             {rows[ri].map((k, i) => (
-              <button key={k + i} onClick={() => onPress(k)} style={i === 3 ? btnOp : btn} aria-label={k} title={k}>
+              <button
+                key={k + i}
+                onClick={() => onPress(k)}
+                style={i === 3 ? btnOp : btn}
+                aria-label={k}
+                title={k}
+              >
                 {k}
               </button>
             ))}
           </div>
         ))}
 
+        {/* 最下段 0 . = */}
         <div style={rowStyle}>
-          <button onClick={() => onPress("0")} style={btnWide} aria-label="0" title="0">0</button>
-          <button onClick={() => onPress(".")} style={btn} aria-label="." title=".">.</button>
+          <button onClick={() => onPress("0")} style={btnWide} aria-label="0" title="0">
+            0
+          </button>
+          <button onClick={() => onPress(".")} style={btn} aria-label="." title=".">
+            .
+          </button>
           <button onClick={() => onPress("=")} style={eqBtn} aria-label="Enter" title="Enter">
+            {/* = を矢印に表示だけ変更 */}
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-              <path fill="currentColor" d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10.5l2.3 2.3-1.4 1.4L7 15.3l4.4-4.4 1.4 1.4L10.5 14H18V5H6v3H4V5Z"/>
+              <path
+                fill="currentColor"
+                d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10.5l2.3 2.3-1.4 1.4L7 15.3l4.4-4.4 1.4 1.4L10.5 14H18V5H6v3H4V5Z"
+              />
             </svg>
           </button>
         </div>
