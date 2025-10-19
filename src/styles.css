@@ -168,3 +168,27 @@ body{
   .side{position:static;}
   .calc-sheet{max-width:100%;margin:0 auto;}
 }
+/* ===== Mobile-only compact layout ===== */
+@media (max-width: 480px) {
+  :root { --ui-scale: 0.88; }
+
+  .title { font-size: 1.35rem; }
+
+  /* 左カラムのカード2枚をそのまま縮小。幅の食い違いを打消すため width を逆算 */
+  .cards .card {
+    transform: scale(var(--ui-scale));
+    transform-origin: top left;
+    width: calc(100% / var(--ui-scale));
+  }
+
+  /* 右カラムの電卓も縮小 */
+  .side > * {
+    transform: scale(var(--ui-scale));
+    transform-origin: top right;
+    width: calc(100% / var(--ui-scale));
+  }
+
+  /* 余白を少しだけ詰める */
+  .layout { gap: 12px; }
+  .cards { gap: 14px; }
+}

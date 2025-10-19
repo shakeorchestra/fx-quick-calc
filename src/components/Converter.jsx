@@ -2,12 +2,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getCurrencyNameJa, fetchPairRate } from "../api/rates.js";
 
-/**
- * Converter
- * - クリックで onActivate(id) を呼び出して「電卓の適用先」を切替
- * - amount/setAmount が来たらそれを優先（来なければローカルstate）
- * - 入力のたびに即時計算（リアルタイム）
- */
 export default function Converter({
   id,
   title = "通貨換算",
@@ -25,44 +19,47 @@ export default function Converter({
   const [date, setDate] = useState(null);
   const [error, setError] = useState(null);
 
+  // 画面幅でモバイル判定（PCはfalseのまま）
+  const isMobile =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(max-width: 480px)").matches;
+
   const activeAmount = amount ?? localAmount;
 
   const handleActivate = () => {
-    if (onActivate) onActivate(id);
+    onActivate && onActivate(id);
   };
 
-  // 数値入力イベント
   const handleChange = (e) => {
     const v = e.target.value;
-    if (setAmount) setAmount(v);
-    else setLocalAmount(v);
+    setAmount ? setAmount(v) : setLocalAmount(v);
   };
 
-  // レート取得
   useEffect(() => {
     let ignore = false;
-    async function load() {
+    (async () => {
       try {
         const res = await fetchPairRate(base, target);
-        if (!ignore) {
-          if (res.rate) {
-            setRate(res.rate);
-            setDate(res.date);
-            setError(null);
-          } else {
-            setRate(null);
-            setError(res.error || "レートを取得できませんでした");
-          }
+        if (ignore) return;
+        if (res.rate) {
+          setRate(res.rate);
+          setDate(res.date);
+          setError(null);
+        } else {
+          setRate(null);
+          setError(res.error || "レートを取得できませんでした");
         }
-      } catch (e) {
+      } catch {
         if (!ignore) {
           setError("レートを取得できませんでした");
           setRate(null);
         }
       }
-    }
-    load();
-    return () => { ignore = true; };
+    })();
+    return () => {
+      ignore = true;
+    };
   }, [base, target]);
 
   const converted = useMemo(() => {
@@ -102,6 +99,10 @@ export default function Converter({
           value={activeAmount}
           onClick={(e) => e.stopPropagation()}
           onChange={handleChange}
+          // スマホだけキーボード抑止（PCはそのまま）
+          readOnly={isMobile}
+          inputMode={isMobile ? "none" : "decimal"}
+          onFocus={isMobile ? (e) => e.target.blur() : undefined}
         />
 
         <span style={{ fontSize: "1.4rem" }}>→</span>
