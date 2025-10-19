@@ -1,16 +1,21 @@
-// src/Calculator.jsx
+// src/components/Calculator.jsx
 import React, { useState } from "react"
 
-export default function Calculator() {
+export default function Calculator({ amount, setAmount, activeLabel }) {
   const [input, setInput] = useState("0")
   const [justEvaluated, setJustEvaluated] = useState(false)
 
-  // --- % 前処理 ---
+  const pushToParent = (val) => {
+    if (typeof setAmount === "function") {
+      const n = Number(val)
+      if (!Number.isNaN(n)) setAmount(n)
+    }
+  }
+
+  // % 前処理
   const preprocessPercent = (expr) => {
     let s = expr
-    // 乗除: 右項の B% を (B/100)
     s = s.replace(/([*/])\s*(\d+(?:\.\d+)?)%/g, (_, op, b) => `${op}(${b}/100)`)
-    // 加減: 左項 A を基準  A±B% → A±(A*B/100)
     s = s.replace(
       /(\d+(?:\.\d+)?)(\s*[+\-]\s*)(\d+(?:\.\d+)?)%/g,
       (_, a, op, b) => `${a}${op}(${a}*${b}/100)`
@@ -33,7 +38,6 @@ export default function Calculator() {
   }
 
   const toggleSign = () => {
-    // 末尾の数値だけ符号反転
     setInput((prev) => {
       const m = prev.match(/(-?\d+(\.\d+)?)$/)
       if (!m) return prev
@@ -48,24 +52,24 @@ export default function Calculator() {
       if (!/^[0-9+\-*/().%\s]+$/.test(expr)) throw new Error("invalid")
       // eslint-disable-next-line no-eval
       const v = eval(preprocessPercent(expr))
-      setInput(String(v))
+      const s = String(v)
+      setInput(s)
       setJustEvaluated(true)
+      pushToParent(s)          // ← 矢印(=)で親の入力に反映
     } catch {
       setInput("エラー")
       setJustEvaluated(true)
     }
   }
 
-  // ---- キー配置（デザイン維持）----
   const rows = [
     ["AC", "±", "%", "÷"],
     ["7", "8", "9", "×"],
-    ["4", "5", "6", "−"], // 表示は "−"、計算時は "-" に置換
+    ["4", "5", "6", "−"],
     ["1", "2", "3", "+"],
     ["0", ".", "="],
   ]
 
-  // ---- スタイル（既存配色に合わせたダークUI；外部依存なし）----
   const root = {
     width: 360,
     background: "#0f172a",
@@ -114,64 +118,38 @@ export default function Calculator() {
     if (label === "+") return append("+")
     if (label === ".") return append(".")
     if (label === "0") return append("0")
-    // 数字
     return append(label)
   }
 
   return (
     <div style={root}>
-      <div aria-label="display" style={screenWrap}>
-        {input}
-      </div>
+      <div aria-label="display" style={screenWrap}>{input}</div>
 
       <div style={grid}>
-        {/* 1行目 */}
         <div style={rowStyle}>
           {rows[0].map((k) => (
-            <button
-              key={k}
-              onClick={() => onPress(k)}
-              style={k === "÷" ? btnOp : btn}
-              aria-label={k}
-              title={k}
-            >
+            <button key={k} onClick={() => onPress(k)} style={k === "÷" ? btnOp : btn} aria-label={k} title={k}>
               {k}
             </button>
           ))}
         </div>
 
-        {/* 2〜4行目 */}
         {[1, 2, 3].map((ri) => (
           <div style={rowStyle} key={ri}>
             {rows[ri].map((k, i) => (
-              <button
-                key={k + i}
-                onClick={() => onPress(k)}
-                style={i === 3 ? btnOp : btn}
-                aria-label={k}
-                title={k}
-              >
+              <button key={k + i} onClick={() => onPress(k)} style={i === 3 ? btnOp : btn} aria-label={k} title={k}>
                 {k}
               </button>
             ))}
           </div>
         ))}
 
-        {/* 最下段 0 . = */}
         <div style={rowStyle}>
-          <button onClick={() => onPress("0")} style={btnWide} aria-label="0" title="0">
-            0
-          </button>
-          <button onClick={() => onPress(".")} style={btn} aria-label="." title=".">
-            .
-          </button>
+          <button onClick={() => onPress("0")} style={btnWide} aria-label="0" title="0">0</button>
+          <button onClick={() => onPress(".")} style={btn} aria-label="." title=".">.</button>
           <button onClick={() => onPress("=")} style={eqBtn} aria-label="Enter" title="Enter">
-            {/* = を矢印に置換（デザイン変更はここだけ） */}
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10.5l2.3 2.3-1.4 1.4L7 15.3l4.4-4.4 1.4 1.4L10.5 14H18V5H6v3H4V5Z"
-              />
+              <path fill="currentColor" d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10.5l2.3 2.3-1.4 1.4L7 15.3l4.4-4.4 1.4 1.4L10.5 14H18V5H6v3H4V5Z"/>
             </svg>
           </button>
         </div>
