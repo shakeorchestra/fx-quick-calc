@@ -1,22 +1,12 @@
 {
-  "name": "fx-quick-calc-final",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4173"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "preview": "vite preview",
+    "predeploy": "npm run build && cp dist/index.html dist/404.html && sh -c 'echo > dist/.nojekyll'",
+    "deploy": "gh-pages -d dist -b gh-pages -m \"deploy\""
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.2"
-  },
-  "engines": {
-    "node": "20.x"
+    "gh-pages": "^6.1.1"
   }
 }
