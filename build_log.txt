@@ -1,0 +1,23 @@
+
+> build
+> vite build
+
+vite v7.1.11 building for production...
+transforming...
+✓ 2 modules transformed.
+✗ Build failed in 66ms
+error during build:
+[vite]: Rollup failed to resolve import "react/jsx-runtime" from "/Users/shakeorchestra/Downloads/fx-quick-calc/src/main.jsx".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`
+    at viteLog (file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/vite/dist/node/chunks/config.js:33879:57)
+    at file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/vite/dist/node/chunks/config.js:33913:73
+    at onwarn (file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/@vitejs/plugin-react/dist/index.js:55:7)
+    at file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/vite/dist/node/chunks/config.js:33913:28
+    at onRollupLog (file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/vite/dist/node/chunks/config.js:33908:63)
+    at onLog (file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/vite/dist/node/chunks/config.js:33711:4)
+    at file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/rollup/dist/es/shared/node-entry.js:20937:32
+    at Object.logger [as onLog] (file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/rollup/dist/es/shared/node-entry.js:22823:9)
+    at ModuleLoader.handleInvalidResolvedId (file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/rollup/dist/es/shared/node-entry.js:21567:26)
+    at file:///Users/shakeorchestra/Downloads/fx-quick-calc/node_modules/rollup/dist/es/shared/node-entry.js:21525:26
